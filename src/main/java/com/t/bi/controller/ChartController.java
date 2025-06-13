@@ -1,5 +1,9 @@
 package com.t.bi.controller;
 
+import com.alibaba.dashscope.aigc.generation.Generation;
+import com.alibaba.dashscope.aigc.generation.GenerationParam;
+import com.alibaba.dashscope.common.Message;
+import com.alibaba.dashscope.common.Role;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.google.gson.Gson;
@@ -20,6 +24,7 @@ import com.t.bi.model.entity.User;
 import com.t.bi.model.enums.FileUploadBizEnum;
 import com.t.bi.service.ChartService;
 import com.t.bi.service.UserService;
+import com.t.bi.utils.ExcelUtils;
 import com.t.bi.utils.SqlUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.ObjectUtils;
@@ -31,8 +36,8 @@ import org.springframework.web.multipart.MultipartFile;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
-import java.io.File;
-import java.util.List;
+import java.util.Arrays;
+
 
 /**
  * 帖子接口
@@ -105,7 +110,7 @@ public class ChartController {
      * 文件上传
      *
      * @param multipartFile
-     * @param uploadFileRequest
+     * @param genChartByAiRequest
      * @param request
      * @return
      */
@@ -118,39 +123,18 @@ public class ChartController {
         if (StringUtils.isAnyBlank(name, goal, chartType)) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
         }
+        // 校验文件名称长度
+        ThrowUtils.throwIf(name.length() > 100, ErrorCode.PARAMS_ERROR, "名称过长");
+        StringBuilder userInput = new StringBuilder();
+        // 数据分析师预设
+        final String prompt = "你是一个数据分析专家，请根据提供的数据，生成" + goal + "，请使用markdown格式";
+        userInput.append("你是一个数据分析师： ");
+        String s = ExcelUtils.excelTtoCsv(multipartFile);
+        userInput.append("分析目标：").append(goal).append("\n");
+        userInput.append("数据：").append("\n").append(s).append("\n");
+        // 调用通义千问的接口
 
-
-        String biz = uploadFileRequest.getBiz();
-        FileUploadBizEnum fileUploadBizEnum = FileUploadBizEnum.getEnumByValue(biz);
-        if (fileUploadBizEnum == null) {
-            throw new BusinessException(ErrorCode.PARAMS_ERROR);
-        }
-        validFile(multipartFile, fileUploadBizEnum);
-        User loginUser = userService.getLoginUser(request);
-        // 文件目录：根据业务、用户来划分
-        String uuid = RandomStringUtils.randomAlphanumeric(8);
-        String filename = uuid + "-" + multipartFile.getOriginalFilename();
-        String filepath = String.format("/%s/%s/%s", fileUploadBizEnum.getValue(), loginUser.getId(), filename);
-        File file = null;
-        try {
-            // 上传文件
-            file = File.createTempFile(filepath, null);
-            multipartFile.transferTo(file);
-            cosManager.putObject(filepath, file);
-            // 返回可访问地址
-            return ResultUtils.success(FileConstant.COS_HOST + filepath);
-        } catch (Exception e) {
-            log.error("file upload error, filepath = " + filepath, e);
-            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "上传失败");
-        } finally {
-            if (file != null) {
-                // 删除临时文件
-                boolean delete = file.delete();
-                if (!delete) {
-                    log.error("file delete error, filepath = {}", filepath);
-                }
-            }
-        }
+        return ResultUtils.success(userInput.toString());
     }
 
     /**

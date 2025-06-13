@@ -101,3 +101,9 @@ knife4j:
         api-rule: package
         api-rule-resources:
           - com.t.bi.controller
+# spark
+spark:
+  api:
+    key: Bearer hQcLbaGWTBHazDCPmmNB:VNXIdCDGKVcraZDFsNbB
+    url: https://spark-api-open.xf-yun.com/v1/chat/completions
+    app_id: 3aedda25
