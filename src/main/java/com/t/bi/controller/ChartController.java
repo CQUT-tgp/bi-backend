@@ -17,6 +17,7 @@ import com.t.bi.constant.FileConstant;
 import com.t.bi.constant.UserConstant;
 import com.t.bi.exception.BusinessException;
 import com.t.bi.exception.ThrowUtils;
+import com.t.bi.manager.RedisLimiterManager;
 import com.t.bi.model.dto.chart.*;
 import com.t.bi.model.dto.file.UploadFileRequest;
 import com.t.bi.model.entity.Chart;
@@ -59,6 +60,8 @@ public class ChartController {
 
     @Resource
     private ChartService chartService;
+    @Resource
+    private RedisLimiterManager redisLimiterManager;
 
     @Resource
     private UserService userService;
@@ -146,6 +149,8 @@ public BaseResponse<String> uploadFile(@RequestPart("file") MultipartFile multip
             @RequestPart("file") MultipartFile multipartFile,
             HttpServletRequest request
             ) {
+        // 限流判断
+        redisLimiterManager.doRateLimit("gen:"+userService.getLoginUser(request).getId());
         System.out.println("------- 请求进行中");
         String name = genChartByAiRequest.getName();
         String goal = genChartByAiRequest.getGoal();
