@@ -1,6 +1,7 @@
 package com.t.bi.model.dto.chart;
 
 import lombok.Data;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.io.Serializable;
 
@@ -32,6 +33,7 @@ public class GenChartByAiRequest implements Serializable {
      * 图表数据
      */
     private String chartData;
+
 
     private static final long serialVersionUID = 1L;
 }

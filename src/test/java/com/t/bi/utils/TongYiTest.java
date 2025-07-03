@@ -16,8 +16,13 @@ public class TongYiTest {
     @Test
     public void test() {
         try {
-            System.out.println(sparkApiDemo.AUTHORIZATION);
-            System.out.println(sparkApiDemo.sendStreamRequest("你是谁"));
+
+            System.out.println(sparkApiDemo.sendStreamRequest("分析需求：统计某公司第一季度各地区的销售额占比  \n" +
+                    "原始数据：Region,Sales  \n" +
+                    "North,20000  \n" +
+                    "South,15000  \n" +
+                    "East,25000  \n" +
+                    "West,18000\n"));
         } catch (IOException e) {
             throw new RuntimeException(e);
         }

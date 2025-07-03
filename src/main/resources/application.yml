@@ -2,6 +2,7 @@
 # @author <a href="https://github.com/liyupi">程序员鱼皮</a>
 # @from <a href="https://yupi.icu">编程导航知识星球</a>
 spring:
+
   application:
     name: bi
   # 默认 dev 环境
@@ -41,8 +42,10 @@ spring:
   # 文件上传
   servlet:
     multipart:
-      # 大小限制
-      max-file-size: 10MB
+      enabled: true
+      max-file-size: 100MB
+      max-request-size: 100MB
+
 server:
   address: 0.0.0.0
   port: 8101
@@ -52,6 +55,8 @@ server:
     session:
       cookie:
         max-age: 2592000
+    tomcat:
+      basedir: /data/apps/temp
 mybatis-plus:
   configuration:
     map-underscore-to-camel-case: false
@@ -104,6 +109,12 @@ knife4j:
 # spark
 spark:
   api:
-    key: Bearer hQcLbaGWTBHazDCPmmNB:VNXIdCDGKVcraZDFsNbB
+    key: Bearer TdXZFnerzcetvZCHhyEP:oOiKJpKSzmQBArYiwhcJ
     url: https://spark-api-open.xf-yun.com/v1/chat/completions
     app_id: 3aedda25
+
+## MULTIPART (MultipartProperties)
+# 开启 multipart 上传功能
+
+
+

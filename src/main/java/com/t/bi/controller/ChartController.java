@@ -22,11 +22,14 @@ import com.t.bi.model.dto.file.UploadFileRequest;
 import com.t.bi.model.entity.Chart;
 import com.t.bi.model.entity.User;
 import com.t.bi.model.enums.FileUploadBizEnum;
+import com.t.bi.model.vo.BiResponse;
 import com.t.bi.service.ChartService;
 import com.t.bi.service.UserService;
+import com.t.bi.utils.AiManage;
 import com.t.bi.utils.ExcelUtils;
 import com.t.bi.utils.SqlUtils;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -36,6 +39,10 @@ import org.springframework.web.multipart.MultipartFile;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStreamReader;
 import java.util.Arrays;
 
 
@@ -55,6 +62,8 @@ public class ChartController {
 
     @Resource
     private UserService userService;
+    @Resource
+    private AiManage aiManage;
 
     private final static Gson GSON = new Gson();
 
@@ -106,35 +115,92 @@ public class ChartController {
         boolean b = chartService.removeById(id);
         return ResultUtils.success(b);
     }
+//  上传文件，打印里面的文字
+@PostMapping("/upload")
+public BaseResponse<String> uploadFile(@RequestPart("file") MultipartFile multipartFile) {
+        // 文件是text类型 直接打印文字,流式读取
+    try (BufferedReader reader = new BufferedReader(new InputStreamReader(multipartFile.getInputStream()))) {
+        String line;
+        while ((line = reader.readLine()) != null) {
+            System.out.println(line);
+        }
+    } catch (IOException e) {
+        throw new RuntimeException(e);
+    }
+    return ResultUtils.success("success");
+
+}
+
+
     /**
      * 文件上传
      *
      * @param multipartFile
-     * @param genChartByAiRequest
-     * @param request
+//     * @param genChartByAiRequest
+//     * @param request
      * @return
      */
     @PostMapping("/gen")
-    public BaseResponse<String> genChartByAi(@RequestPart("file") MultipartFile multipartFile,
-                                             GenChartByAiRequest genChartByAiRequest, HttpServletRequest request) {
+    public BaseResponse<BiResponse> genChartByAi(
+            @ModelAttribute("genChartByAiRequest") GenChartByAiRequest genChartByAiRequest,
+            @RequestPart("file") MultipartFile multipartFile,
+            HttpServletRequest request
+            ) {
+        System.out.println("------- 请求进行中");
         String name = genChartByAiRequest.getName();
         String goal = genChartByAiRequest.getGoal();
         String chartType = genChartByAiRequest.getChartType();
-        if (StringUtils.isAnyBlank(name, goal, chartType)) {
-            throw new BusinessException(ErrorCode.PARAMS_ERROR);
-        }
-        // 校验文件名称长度
-        ThrowUtils.throwIf(name.length() > 100, ErrorCode.PARAMS_ERROR, "名称过长");
+//        String name = "1";
+//        String goal = "1";
+//        String chartType = "1";
+        System.out.println("---------运行到这");
+        // 获取文件名，然后检查后缀是否为 excel 格式
+        String filename = multipartFile.getOriginalFilename();
+        ThrowUtils.throwIf(!filename.endsWith(".xlsx"), ErrorCode.PARAMS_ERROR, "文件格式错误");
+        // 校验
+        ThrowUtils.throwIf(StringUtils.isBlank(goal), ErrorCode.PARAMS_ERROR, "目标为空");
+        ThrowUtils.throwIf(StringUtils.isNotBlank(name) && name.length() > 100, ErrorCode.PARAMS_ERROR, "名称过长");
         StringBuilder userInput = new StringBuilder();
         // 数据分析师预设
         final String prompt = "你是一个数据分析专家，请根据提供的数据，生成" + goal + "，请使用markdown格式";
         userInput.append("你是一个数据分析师： ");
+        // 先要把文件保存到本地，然后异步解析
+        ThrowUtils.throwIf(multipartFile == null, ErrorCode.PARAMS_ERROR, "未选择文件");
+
         String s = ExcelUtils.excelTtoCsv(multipartFile);
         userInput.append("分析目标：").append(goal).append("\n");
         userInput.append("数据：").append("\n").append(s).append("\n");
         // 调用通义千问的接口
+        String answer = aiManage.doChat(userInput.toString());
+        System.out.println(answer+"-------answer");
+        // 根据------ 分割结果
+        String[] split = answer.split("------");
+        String genChart = "";
+        String genResult = "";
+        if (split.length < 2){
+            genChart = split[0];
+            genResult = split[0];
 
-        return ResultUtils.success(userInput.toString());
+        }
+
+        BiResponse biResponse = new BiResponse();
+        biResponse.setGenChart(genChart);
+        biResponse.setGenResult(genResult);
+
+        // 放入数据库
+        Chart chart = new Chart();
+        chart.setName(name);
+        chart.setGoal(goal);
+        chart.setChartData(s);
+        chart.setChartType(chartType);
+        chart.setGenChart(genChart);
+        chart.setGenResult(genResult);
+
+        // 获取userid
+        User loginUser = userService.getLoginUser(request);
+        chart.setUserId(loginUser.getId());
+        chartService.save(chart);
+        return ResultUtils.success(biResponse);
     }
 
     /**
