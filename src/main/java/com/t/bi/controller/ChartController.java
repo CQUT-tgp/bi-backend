@@ -45,6 +45,8 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.Arrays;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ThreadPoolExecutor;
 
 
 /**
@@ -67,6 +69,8 @@ public class ChartController {
     private UserService userService;
     @Resource
     private AiManage aiManage;
+    @Resource
+    private ThreadPoolExecutor threadPoolExecutor;
 
     private final static Gson GSON = new Gson();
 
@@ -175,36 +179,56 @@ public BaseResponse<String> uploadFile(@RequestPart("file") MultipartFile multip
         String s = ExcelUtils.excelTtoCsv(multipartFile);
         userInput.append("分析目标：").append(goal).append("\n");
         userInput.append("数据：").append("\n").append(s).append("\n");
-        // 调用通义千问的接口
-        String answer = aiManage.doChat(userInput.toString());
-        System.out.println(answer+"-------answer");
-        // 根据------ 分割结果
-        String[] split = answer.split("------");
-        String genChart = "";
-        String genResult = "";
-        if (split.length < 2){
-            genChart = split[0];
-            genResult = split[0];
-
-        }
-
+        // 先将数据保存到数据库，然后调用异步接口处理
         BiResponse biResponse = new BiResponse();
-        biResponse.setGenChart(genChart);
-        biResponse.setGenResult(genResult);
-
         // 放入数据库
         Chart chart = new Chart();
         chart.setName(name);
         chart.setGoal(goal);
         chart.setChartData(s);
         chart.setChartType(chartType);
-        chart.setGenChart(genChart);
-        chart.setGenResult(genResult);
-
+        chart.setStatus("waiting");
         // 获取userid
         User loginUser = userService.getLoginUser(request);
         chart.setUserId(loginUser.getId());
         chartService.save(chart);
+        // 调用通义千问的接口
+        CompletableFuture.runAsync(() -> {
+
+            // 先修改chart 的状态
+            Chart chart1 = new Chart();
+            chart1.setId(chart.getId());
+            chart1.setStatus("running");
+            boolean b = chartService.updateById(chart1);
+            if (!b){
+
+                throw new BusinessException(ErrorCode.SYSTEM_ERROR);
+            }
+            // 异步处理
+            // 获取用户输入
+
+            String answer = aiManage.doChat(userInput.toString());
+            System.out.println(answer+"-------answer");
+            // 根据------ 分割结果
+            String[] split = answer.split("------");
+            String genChart = "";
+            String genResult = "";
+            if (split.length < 2){
+                genChart = split[0];
+                genResult = split[0];
+            }
+            // 更新数据库
+            chart1.setStatus("success");
+            chart1.setGenChart(genChart);
+            chart1.setGenResult(genResult);
+            boolean update = chartService.updateById(chart1);
+            if (!update){
+                throw new BusinessException(ErrorCode.OPERATION_ERROR,"更新图表状态失败");
+            }
+        }, threadPoolExecutor);
+
+
+
         return ResultUtils.success(biResponse);
     }
 
