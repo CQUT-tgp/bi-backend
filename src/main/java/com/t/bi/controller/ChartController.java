@@ -8,6 +8,7 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.google.gson.Gson;
 import com.t.bi.annotation.AuthCheck;
+import com.t.bi.bizmq.BiMessageProducer;
 import com.t.bi.common.BaseResponse;
 import com.t.bi.common.DeleteRequest;
 import com.t.bi.common.ErrorCode;
@@ -59,6 +60,8 @@ import java.util.concurrent.ThreadPoolExecutor;
 @RequestMapping("/chart")
 @Slf4j
 public class ChartController {
+    @Resource
+    private BiMessageProducer biMessageProducer;
 
     @Resource
     private ChartService chartService;
@@ -192,40 +195,42 @@ public BaseResponse<String> uploadFile(@RequestPart("file") MultipartFile multip
         User loginUser = userService.getLoginUser(request);
         chart.setUserId(loginUser.getId());
         chartService.save(chart);
+        Long id = chart.getId();
+        biMessageProducer.sendMesage(String.valueOf(id));
         // 调用通义千问的接口
-        CompletableFuture.runAsync(() -> {
-
-            // 先修改chart 的状态
-            Chart chart1 = new Chart();
-            chart1.setId(chart.getId());
-            chart1.setStatus("running");
-            boolean b = chartService.updateById(chart1);
-            if (!b){
-
-                throw new BusinessException(ErrorCode.SYSTEM_ERROR);
-            }
-            // 异步处理
-            // 获取用户输入
-
-            String answer = aiManage.doChat(userInput.toString());
-            System.out.println(answer+"-------answer");
-            // 根据------ 分割结果
-            String[] split = answer.split("------");
-            String genChart = "";
-            String genResult = "";
-            if (split.length < 2){
-                genChart = split[0];
-                genResult = split[0];
-            }
-            // 更新数据库
-            chart1.setStatus("success");
-            chart1.setGenChart(genChart);
-            chart1.setGenResult(genResult);
-            boolean update = chartService.updateById(chart1);
-            if (!update){
-                throw new BusinessException(ErrorCode.OPERATION_ERROR,"更新图表状态失败");
-            }
-        }, threadPoolExecutor);
+//        CompletableFuture.runAsync(() -> {
+//
+//            // 先修改chart 的状态
+//            Chart chart1 = new Chart();
+//            chart1.setId(chart.getId());
+//            chart1.setStatus("running");
+//            boolean b = chartService.updateById(chart1);
+//            if (!b){
+//
+//                throw new BusinessException(ErrorCode.SYSTEM_ERROR);
+//            }
+//            // 异步处理
+//            // 获取用户输入
+//
+//            String answer = aiManage.doChat(userInput.toString());
+//            System.out.println(answer+"-------answer");
+//            // 根据------ 分割结果
+//            String[] split = answer.split("------");
+//            String genChart = "";
+//            String genResult = "";
+//            if (split.length < 2){
+//                genChart = split[0];
+//                genResult = split[0];
+//            }
+//            // 更新数据库
+//            chart1.setStatus("success");
+//            chart1.setGenChart(genChart);
+//            chart1.setGenResult(genResult);
+//            boolean update = chartService.updateById(chart1);
+//            if (!update){
+//                throw new BusinessException(ErrorCode.OPERATION_ERROR,"更新图表状态失败");
+//            }
+//        }, threadPoolExecutor);
 
 
 
