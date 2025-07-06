@@ -118,8 +118,20 @@ spark:
     url: https://spark-api-open.xf-yun.com/v1/chat/completions
     app_id: 3aedda25
 
+tongyi:
+  api:
+    key: sk-09d8bb52b3aa4cbda04a1072b2483cee
+    url: https://dashscope.aliyuncs.com/compatible-mode/v1
+    app_id: 0b0d0f05-0a0b-0c0d-0e0f-0a0b0c0d0e0f
 ## MULTIPART (MultipartProperties)
 # 开启 multipart 上传功能
+
+langchain4j:
+  open-ai:
+    chat-model:
+      base-url: https://dashscope.aliyuncs.com/compatible-mode/v1
+      api-key: sk-09d8bb52b3aa4cbda04a1072b2483cee
+      model-name: qwen-plus
 
 
 
